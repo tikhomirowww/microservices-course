@@ -1,0 +1,50 @@
+version: '3.8'                                                                                                                                                                                                                                                          
+services:                                                                                                                            
+  postgres-users:                                                                                                                    
+    image: postgres:16
+    container_name: postgres-users
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres                                                                                                        
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: users_db 
+  postgres-orders:                                                                                                                    
+    image: postgres:16
+    container_name: postgres-orders
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_USER: postgres                                                                                                        
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: orders_db 
+  user-service:                                                                                                                 
+      build: ./user-service                                                                                                            
+      container_name: user-service                                                                                                     
+      ports:                                                                                                                           
+        - "3001:3001"                                                                                                                  
+      environment:
+        PORT: 3001                                                                                                                     
+        DB_HOST: postgres-users
+        DB_PORT: 5432                                                                                                                  
+        DB_USERNAME: postgres
+        DB_PASSWORD: postgres
+        DB_NAME: users_db                                                                                                              
+      depends_on:
+        - postgres-users                                                                                                               
+  order-service:
+    build: ./order-service
+    container_name: order-service
+    ports:
+      - "3002:3002"                                                                                                                  
+    environment:
+      PORT: 3002                                                                                                                     
+      DB_HOST: postgres-orders
+      DB_PORT: 5432
+      DB_USERNAME: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: orders_db
+      USER_SERVICE_URL: http://user-service:3001                                                                                     
+    depends_on:
+      - postgres-orders                                                                                                              
+      - user-service
