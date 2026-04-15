@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, Logger } from '@nestjs/common';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { UpdateOrderDto } from './dto/update-order.dto';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -8,6 +8,7 @@ import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 import { ConfigService } from '@nestjs/config';
 import { ORDER_STATUS_ENUM } from './entities/enums';
+import { ClientProxy } from '@nestjs/microservices';
 
 @Injectable()
 export class OrdersService {
@@ -16,6 +17,9 @@ export class OrdersService {
   private readonly orderRepository: Repository<Order>;
   private readonly userServiceUrl: string;
 
+  @Inject('NOTIFICATION_SERVICE')                                                                                      
+  private readonly notificationClient: ClientProxy
+  
   constructor(
     private readonly config: ConfigService,
     private readonly httpService: HttpService,
@@ -42,12 +46,19 @@ export class OrdersService {
     } catch {                                                                                                                          
       throw new BadRequestException('User not found');
     }
-    return this.orderRepository.save(
+    const saved = await this.orderRepository.save(
       this.orderRepository.create({                                                                                                    
         ...createOrderDto,
         status: ORDER_STATUS_ENUM.PENDING,                                                                                             
       }),                                                                                                                              
     );
+
+    this.notificationClient.emit('order_created', {
+      orderId: saved.id,
+      userId: saved.userId,
+      email: user.email,
+    });
+    return saved;
   }
 
   async findAll() {

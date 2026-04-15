@@ -44,7 +44,22 @@ services:
       DB_USERNAME: postgres
       DB_PASSWORD: postgres
       DB_NAME: orders_db
-      USER_SERVICE_URL: http://user-service:3001                                                                                     
+      USER_SERVICE_URL: http://user-service:3001
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672                                                                            
     depends_on:
       - postgres-orders                                                                                                              
       - user-service
+      - rabbitmq
+  rabbitmq:                                                                                                                          
+    image: rabbitmq:3-management                                                                                                     
+    container_name: rabbitmq                                                                                                         
+    ports:                                                                                                                           
+      - "5672:5672"                                                                                                                  
+      - "15672:15672"
+  notification-service:                                                                                                              
+    build: ./notification-service                                                                                                    
+    container_name: notification-service                                                                                             
+    environment:                                                                                                                     
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672                                                                                 
+    depends_on: 
+      - rabbitmq
