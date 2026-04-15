@@ -9,6 +9,7 @@ import { firstValueFrom } from 'rxjs';
 import { ConfigService } from '@nestjs/config';
 import { ORDER_STATUS_ENUM } from './entities/enums';
 import { ClientProxy } from '@nestjs/microservices';
+import CircuitBreaker from 'opossum';
 
 @Injectable()
 export class OrdersService {
@@ -16,7 +17,8 @@ export class OrdersService {
   @InjectRepository(Order)
   private readonly orderRepository: Repository<Order>;
   private readonly userServiceUrl: string;
-
+  private readonly breaker: CircuitBreaker;
+  
   @Inject('NOTIFICATION_SERVICE')                                                                                      
   private readonly notificationClient: ClientProxy
   
@@ -25,6 +27,11 @@ export class OrdersService {
     private readonly httpService: HttpService,
   ) {
     this.userServiceUrl = this.config.getOrThrow<string>('USER_SERVICE_URL');
+    this.breaker = new CircuitBreaker((id: string) => this.getUsers(id), {
+      timeout: 3000,
+      errorThresholdPercentage: 50,
+      resetTimeout: 30000,
+    }); 
   }
 
   private async getUsers(id: string) {
@@ -42,14 +49,14 @@ export class OrdersService {
   async create(createOrderDto: CreateOrderDto) {
     let user;                                                                                                                          
     try {                                                                                                                              
-      user = await this.getUsers(createOrderDto.userId);
+      user = await this.breaker.fire(createOrderDto.userId);
     } catch {                                                                                                                          
       throw new BadRequestException('User not found');
     }
     const saved = await this.orderRepository.save(
       this.orderRepository.create({                                                                                                    
         ...createOrderDto,
-        status: ORDER_STATUS_ENUM.PENDING,                                                                                             
+        status: ORDER_STATUS_ENUM.PENDING,                                                                                           
       }),                                                                                                                              
     );
 
