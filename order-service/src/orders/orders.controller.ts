@@ -2,10 +2,22 @@ import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/commo
 import { OrdersService } from './orders.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { UpdateOrderDto } from './dto/update-order.dto';
+import { EventPattern, Payload } from '@nestjs/microservices';
+import { ORDER_STATUS_ENUM } from './entities/enums';
 
 @Controller('orders')
 export class OrdersController {
   constructor(private readonly ordersService: OrdersService) {}
+
+  @EventPattern('payment_completed')                                                                                                   
+  async handlePaymentCompleted(@Payload() data: { orderId: string }) {                                                                 
+    await this.ordersService.updateStatus(data.orderId, ORDER_STATUS_ENUM.CONFIRMED);                                                  
+  }                                                                                                                                    
+   
+  @EventPattern('payment_failed')                                                                                                      
+  async handlePaymentFailed(@Payload() data: { orderId: string }) {
+    await this.ordersService.updateStatus(data.orderId, ORDER_STATUS_ENUM.CANCELLED);                                                  
+  }
 
   @Post()
   create(@Body() createOrderDto: CreateOrderDto) {

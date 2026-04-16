@@ -21,6 +21,9 @@ export class OrdersService {
   
   @Inject('NOTIFICATION_SERVICE')                                                                                      
   private readonly notificationClient: ClientProxy
+
+  @Inject('PAYMENT_SERVICE')                                                                                      
+  private readonly paymentsClient: ClientProxy
   
   constructor(
     private readonly config: ConfigService,
@@ -65,8 +68,18 @@ export class OrdersService {
       userId: saved.userId,
       email: user.email,
     });
+    this.paymentsClient.emit('order_created', {
+      orderId: saved.id,
+      userId: saved.userId,
+    });
     return saved;
   }
+
+  async updateStatus(orderId: string, status: ORDER_STATUS_ENUM) {                                                                     
+    const order = await this.orderRepository.findOne({ where: { id: orderId } });
+    if (!order) throw new BadRequestException('Order not found');                                                                      
+    await this.orderRepository.update({ id: orderId }, { status });
+  } 
 
   async findAll() {
     return await this.orderRepository.find();
