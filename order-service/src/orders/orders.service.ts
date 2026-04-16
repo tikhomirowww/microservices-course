@@ -75,11 +75,27 @@ export class OrdersService {
     return saved;
   }
 
-  async updateStatus(orderId: string, status: ORDER_STATUS_ENUM) {                                                                     
+  async createPending(userId: string) {
+    let user;
+    try {
+      user = await this.breaker.fire(userId);
+    } catch {
+      throw new BadRequestException('User not found');
+    }
+    return await this.orderRepository.save(
+      this.orderRepository.create({
+        userId,
+        status: ORDER_STATUS_ENUM.PENDING,
+      }),
+    );
+  }
+
+  async updateStatus(orderId: string, status: ORDER_STATUS_ENUM) {
     const order = await this.orderRepository.findOne({ where: { id: orderId } });
-    if (!order) throw new BadRequestException('Order not found');                                                                      
+    if (!order) throw new BadRequestException('Order not found');
     await this.orderRepository.update({ id: orderId }, { status });
-  } 
+    return { id: orderId, status };
+  }
 
   async findAll() {
     return await this.orderRepository.find();

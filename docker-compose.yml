@@ -63,10 +63,20 @@ services:
       RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672                                                                                 
     depends_on: 
       - rabbitmq
-  payment-service:                                                                                                              
-    build: ./payment-service                                                                                                    
-    container_name: payment-service                                                                                             
-    environment:                                                                                                                     
-      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672                                                                                 
-    depends_on: 
+  payment-service:
+    build: ./payment-service
+    container_name: payment-service
+    environment:
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+    depends_on:
+      - rabbitmq
+  saga-orchestrator:
+    build: ./saga-orchestrator
+    container_name: saga-orchestrator
+    ports:
+      - "3003:3003"
+    environment:
+      PORT: 3003
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+    depends_on:
       - rabbitmq
