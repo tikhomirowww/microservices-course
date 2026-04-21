@@ -9,7 +9,7 @@ export class AppController {
   @Inject('ORDERS_SERVICE')
   private readonly client: ClientProxy;
 
-  @EventPattern('order_created')
+  @EventPattern('order_created_payment')
   async handleOrderCreated(
     @Payload() data: { orderId: string; userId: string },
   ) {

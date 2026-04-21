@@ -2,13 +2,16 @@ import { Module } from '@nestjs/common';
 import { OrdersService } from './orders.service';
 import { OrdersController } from './orders.controller';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { Order } from './entities/order.entity';
 import { HttpModule } from '@nestjs/axios';
 import { ClientsModule, Transport } from '@nestjs/microservices';
+import { Order, Outbox } from './entities';
+import { ScheduleModule } from '@nestjs/schedule';
+import { OutboxScheduler } from 'src/outbox/outbox.scheduler';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Order]),
+    TypeOrmModule.forFeature([Order, Outbox]),
+    ScheduleModule.forRoot(),
     HttpModule,
     ClientsModule.register([
       {
@@ -36,6 +39,6 @@ import { ClientsModule, Transport } from '@nestjs/microservices';
     ]),
   ],
   controllers: [OrdersController],
-  providers: [OrdersService],
+  providers: [OrdersService, OutboxScheduler],
 })
 export class OrdersModule {}

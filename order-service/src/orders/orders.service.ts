@@ -1,46 +1,53 @@
 import { BadRequestException, Inject, Injectable } from '@nestjs/common';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { UpdateOrderDto } from './dto/update-order.dto';
-import { InjectRepository } from '@nestjs/typeorm';
+import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { Order } from './entities/order.entity';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { ORDER_STATUS_ENUM } from './entities/enums';
 import { ClientProxy } from '@nestjs/microservices';
+import { Outbox } from './entities';
 
 @Injectable()
 export class OrdersService {
-  @InjectRepository(Order)
-  private readonly orderRepository: Repository<Order>;
+  constructor(
+    @InjectRepository(Order)
+    private readonly orderRepository: Repository<Order>,
 
-  @Inject('NOTIFICATION_SERVICE')
-  private readonly notificationClient: ClientProxy;
+    @Inject('NOTIFICATION_SERVICE')
+    private readonly notificationClient: ClientProxy,
 
-  @Inject('PAYMENT_SERVICE')
-  private readonly paymentsClient: ClientProxy;
+    @Inject('PAYMENT_SERVICE')
+    private readonly paymentsClient: ClientProxy,
+
+    @InjectDataSource()
+    private readonly dataSource: DataSource,
+  ) {}
 
   async create(
     createOrderDto: CreateOrderDto,
     userId: string,
     userEmail: string,
   ) {
-    const saved = await this.orderRepository.save(
-      this.orderRepository.create({
+    return await this.dataSource.transaction(async (manager) => {
+      const order = manager.create(Order, {
         ...createOrderDto,
         userId,
         status: ORDER_STATUS_ENUM.PENDING,
-      }),
-    );
+      });
+      const saved = await manager.save(order);
 
-    this.notificationClient.emit('order_created', {
-      orderId: saved.id,
-      userId: saved.userId,
-      email: userEmail,
+      await manager.save(Outbox, {
+        event: 'order_created_notification',
+        payload: { orderId: saved.id, userId: saved.userId, email: userEmail },
+      });
+      await manager.save(Outbox, {
+        event: 'order_created_payment',
+        payload: { orderId: saved.id, userId: saved.userId },
+      });
+
+      return saved;
     });
-    this.paymentsClient.emit('order_created', {
-      orderId: saved.id,
-      userId: saved.userId,
-    });
-    return saved;
   }
 
   async createPending(userId: string) {

@@ -7,7 +7,7 @@ export class AppController {
   private readonly logger = new Logger(AppController.name)
   constructor(private readonly appService: AppService) {}
 
-  @EventPattern('order_created')                                                                                                       
+  @EventPattern('order_created_notification')                                                                                                       
   handleOrderCreated(@Payload() data: { orderId: string; userId: string; email: string }) {                                            
     this.logger.log(`Sending email to ${data.email} for order ${data.orderId}`);                                                       
   }
