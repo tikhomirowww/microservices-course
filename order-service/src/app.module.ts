@@ -4,6 +4,7 @@ import { AppService } from './app.service';
 import { OrdersModule } from './orders/orders.module';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { OrdersReadModule } from './orders-read/orders-read.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
       }),
       inject: [ConfigService],
     }),
+    OrdersReadModule
   ],
   controllers: [AppController],
   providers: [AppService],

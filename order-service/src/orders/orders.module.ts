@@ -7,10 +7,11 @@ import { ClientsModule, Transport } from '@nestjs/microservices';
 import { Order, Outbox } from './entities';
 import { ScheduleModule } from '@nestjs/schedule';
 import { OutboxScheduler } from 'src/outbox/outbox.scheduler';
+import { OrderSummary } from 'src/orders-read/order-summary.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Order, Outbox]),
+    TypeOrmModule.forFeature([Order, Outbox, OrderSummary]),
     ScheduleModule.forRoot(),
     HttpModule,
     ClientsModule.register([

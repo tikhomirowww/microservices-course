@@ -1,12 +1,12 @@
-import { BadRequestException, Inject, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { UpdateOrderDto } from './dto/update-order.dto';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { Order } from './entities/order.entity';
 import { DataSource, Repository } from 'typeorm';
 import { ORDER_STATUS_ENUM } from './entities/enums';
-import { ClientProxy } from '@nestjs/microservices';
 import { Outbox } from './entities';
+import { OrderSummary } from 'src/orders-read/order-summary.entity';
 
 @Injectable()
 export class OrdersService {
@@ -14,11 +14,8 @@ export class OrdersService {
     @InjectRepository(Order)
     private readonly orderRepository: Repository<Order>,
 
-    @Inject('NOTIFICATION_SERVICE')
-    private readonly notificationClient: ClientProxy,
-
-    @Inject('PAYMENT_SERVICE')
-    private readonly paymentsClient: ClientProxy,
+    @InjectRepository(OrderSummary)
+    private readonly orderSummaryRepository: Repository<OrderSummary>,
 
     @InjectDataSource()
     private readonly dataSource: DataSource,
@@ -45,6 +42,12 @@ export class OrdersService {
         event: 'order_created_payment',
         payload: { orderId: saved.id, userId: saved.userId },
       });
+      await manager.save(OrderSummary, {
+        orderId: saved.id,
+        userId: saved.userId,
+        userEmail: userEmail,
+        status: ORDER_STATUS_ENUM.PENDING,
+      });
 
       return saved;
     });
@@ -60,11 +63,13 @@ export class OrdersService {
   }
 
   async updateStatus(orderId: string, status: ORDER_STATUS_ENUM) {
+    console.log('updateStatus called', orderId, status);
     const order = await this.orderRepository.findOne({
       where: { id: orderId },
     });
     if (!order) throw new BadRequestException('Order not found');
     await this.orderRepository.update({ id: orderId }, { status });
+    await this.orderSummaryRepository.update({ orderId }, { status });
     return { id: orderId, status };
   }
 

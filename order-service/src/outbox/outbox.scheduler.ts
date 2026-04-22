@@ -23,9 +23,9 @@ export class OutboxScheduler {
     });
     for (const event of events) {
       if (event.event === 'order_created_notification') {
-        this.notificationClient.emit('order_created', event.payload);
+        this.notificationClient.emit('order_created_notification', event.payload);
       } else if (event.event === 'order_created_payment') {
-        this.paymentsClient.emit('order_created', event.payload);
+        this.paymentsClient.emit('order_created_payment', event.payload);
       }
       await this.outboxRepository.update(event.id, { published: true });
     }
