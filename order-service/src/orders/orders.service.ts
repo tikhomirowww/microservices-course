@@ -1,4 +1,10 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Inject,
+  Injectable,
+  OnModuleInit,
+} from '@nestjs/common';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { UpdateOrderDto } from './dto/update-order.dto';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
@@ -7,9 +13,18 @@ import { DataSource, Repository } from 'typeorm';
 import { ORDER_STATUS_ENUM } from './entities/enums';
 import { Outbox } from './entities';
 import { OrderSummary } from 'src/orders-read/order-summary.entity';
+import { firstValueFrom, Observable } from 'rxjs';
+import type { ClientGrpc } from '@nestjs/microservices';
+
+interface IInventoryService {
+  checkAndReserve: (data: {
+    itemId: string;
+    quantity: number;
+  }) => Observable<{ reserved: boolean }>;
+}
 
 @Injectable()
-export class OrdersService {
+export class OrdersService implements OnModuleInit {
   constructor(
     @InjectRepository(Order)
     private readonly orderRepository: Repository<Order>,
@@ -19,13 +34,30 @@ export class OrdersService {
 
     @InjectDataSource()
     private readonly dataSource: DataSource,
+
+    @Inject('INVENTORY_SERVICE')
+    private readonly grpcClient: ClientGrpc,
   ) {}
+
+  private inventoryService: IInventoryService;
+
+  onModuleInit() {
+    this.inventoryService =
+      this.grpcClient.getService<IInventoryService>('InventoryService');
+  }
 
   async create(
     createOrderDto: CreateOrderDto,
     userId: string,
     userEmail: string,
   ) {
+    const { reserved } = await firstValueFrom(
+      this.inventoryService.checkAndReserve({
+        itemId: createOrderDto.itemId,
+        quantity: createOrderDto.quantity,
+      }),
+    );
+    if (!reserved) throw new ConflictException('Item out of stock');
     return await this.dataSource.transaction(async (manager) => {
       const order = manager.create(Order, {
         ...createOrderDto,

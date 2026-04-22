@@ -32,7 +32,9 @@ services:
       depends_on:
         - postgres-users                                                                                                               
   order-service:
-    build: ./order-service
+    build:
+      context: .                                                                                                                                      
+      dockerfile: order-service/Dockerfile
     container_name: order-service
     environment:
       PORT: 3002                                                                                                                     
@@ -42,11 +44,13 @@ services:
       DB_PASSWORD: postgres
       DB_NAME: orders_db
       USER_SERVICE_URL: http://user-service:3001
-      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672                                                                            
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+      INVENTORY_SERVICE_URL: inventory-service:5000                                                                          
     depends_on:
       - postgres-orders                                                                                                              
       - user-service
       - rabbitmq
+      - inventory-service
   rabbitmq:                                                                                                                          
     image: rabbitmq:3-management                                                                                                     
     container_name: rabbitmq                                                                                                         
@@ -116,3 +120,10 @@ services:
       - user-service
       - order-service
       - saga-orchestrator
+  inventory-service:                                                                                                              
+    build:                                                                                                                                            
+      context: .                                                                                                                                      
+      dockerfile: inventory-service/Dockerfile                                                                                                                       
+    container_name: inventory-service                                                                                                                 
+    environment:                                                                                                                                      
+      GRPC_PORT: 5000

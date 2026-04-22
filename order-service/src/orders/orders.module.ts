@@ -8,6 +8,7 @@ import { Order, Outbox } from './entities';
 import { ScheduleModule } from '@nestjs/schedule';
 import { OutboxScheduler } from 'src/outbox/outbox.scheduler';
 import { OrderSummary } from 'src/orders-read/order-summary.entity';
+import { join } from 'path';
 
 @Module({
   imports: [
@@ -35,6 +36,15 @@ import { OrderSummary } from 'src/orders-read/order-summary.entity';
           ],
           queue: 'payments_queue',
           queueOptions: { durable: true },
+        },
+      },
+      {
+        name: 'INVENTORY_SERVICE',
+        transport: Transport.GRPC,
+        options: {
+          package: 'inventory',
+          protoPath: join(__dirname, '../../../proto/inventory.proto'),
+          url: process.env.INVENTORY_SERVICE_URL ?? 'localhost:5000',
         },
       },
     ]),
