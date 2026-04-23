@@ -20,7 +20,7 @@
 | 8 | **gRPC** | Типизированный бинарный протокол | ⭐⭐⭐ | ✅ Готово |
 | 9 | **Temporal** | Durable саги с retry и историей | ⭐⭐⭐⭐ | ✅ Готово |
 | 10 | **Event Sourcing** | Состояние как лента событий | ⭐⭐⭐⭐⭐ | ✅ Готово |
-| 11 | **Kafka** | Отдельный проект: сравнение с RabbitMQ | ⭐⭐⭐ | ⬜ |
+| 11 | **Kafka** | Отдельный проект: сравнение с RabbitMQ | ⭐⭐⭐ | ✅ Готово |
 
 ---
 
@@ -250,3 +250,36 @@ GET /orders/:id/events → order-service
 > - `OrderSummary` остаётся как read-проекция — именно так и работает Event Sourcing в продакшене
 > - `@CreateDateColumn()` — время проставляется автоматически, не передаётся вручную
 > - Event store — append-only, события никогда не обновляются и не удаляются
+
+---
+
+### ✅ Kafka
+
+> [!example] Коммит
+> [feat: Kafka demo — producer and two independent consumer groups](https://github.com/tikhomirowww/microservices-course/commit/placeholder)
+
+> [!tip] Что решает
+> RabbitMQ удаляет сообщение после ACK — история теряется. Kafka хранит сообщения как append-only лог, консьюмеры читают независимо по своему offset.
+
+**Схема:**
+```
+POST /orders → producer (port 3010)
+  → kafka.emit('order_created', { orderId, userId })
+
+Kafka topic: order_created (хранит все сообщения)
+  ├── payment-group      → [PAYMENT] Processing payment for order ...
+  └── notification-group → [NOTIFICATION] Sending email for order ...
+```
+
+**Что построили (`kafka-demo/`):**
+- `producer` — NestJS HTTP сервис, `POST /orders` публикует событие в топик `order_created`
+- `payment-consumer` — NestJS микросервис с `groupId: payment-group`
+- `notification-consumer` — NestJS микросервис с `groupId: notification-group`
+- Оба консьюмера получают каждое сообщение независимо
+
+> [!important] Ключевые решения
+> - Каждый `groupId` — независимый читатель с собственным offset
+> - В RabbitMQ два консьюмера на одной очереди делят сообщения (round-robin) — каждое получает только один
+> - `--from-beginning` — replay всей истории топика: `kafka-console-consumer --bootstrap-server localhost:9092 --topic order_created --from-beginning`
+> - `restart: on-failure` в docker-compose — консьюмеры автоматически рестартуют если Kafka ещё не готова
+> - Kafka ≠ Event Sourcing: Kafka — транспорт между сервисами, Event Sourcing — паттерн хранения состояния внутри сервиса
