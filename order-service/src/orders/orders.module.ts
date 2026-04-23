@@ -9,6 +9,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { OutboxScheduler } from 'src/outbox/outbox.scheduler';
 import { OrderSummary } from 'src/orders-read/order-summary.entity';
 import { join } from 'path';
+import { EventStoreModule } from 'src/event-store/event-store.module';
 
 @Module({
   imports: [
@@ -48,6 +49,7 @@ import { join } from 'path';
         },
       },
     ]),
+    EventStoreModule
   ],
   controllers: [OrdersController],
   providers: [OrdersService, OutboxScheduler],

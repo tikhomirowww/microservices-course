@@ -5,6 +5,7 @@ import { OrdersModule } from './orders/orders.module';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { OrdersReadModule } from './orders-read/orders-read.module';
+import { EventStoreModule } from './event-store/event-store.module';
 
 @Module({
   imports: [
@@ -23,7 +24,8 @@ import { OrdersReadModule } from './orders-read/orders-read.module';
       }),
       inject: [ConfigService],
     }),
-    OrdersReadModule
+    OrdersReadModule,
+    EventStoreModule
   ],
   controllers: [AppController],
   providers: [AppService],

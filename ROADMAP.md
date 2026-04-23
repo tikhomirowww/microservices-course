@@ -18,8 +18,8 @@
 | 6 | **Outbox Pattern** | Атомарность: БД + очередь | ⭐⭐ | ✅ Готово |
 | 7 | **CQRS** | Разделение read/write моделей | ⭐⭐⭐ | ✅ Готово |
 | 8 | **gRPC** | Типизированный бинарный протокол | ⭐⭐⭐ | ✅ Готово |
-| 9 | **Temporal** | Durable саги с retry и историей | ⭐⭐⭐⭐ | ⬜ |
-| 10 | **Event Sourcing** | Состояние как лента событий | ⭐⭐⭐⭐⭐ | ⬜ |
+| 9 | **Temporal** | Durable саги с retry и историей | ⭐⭐⭐⭐ | ✅ Готово |
+| 10 | **Event Sourcing** | Состояние как лента событий | ⭐⭐⭐⭐⭐ | ✅ Готово |
 | 11 | **Kafka** | Отдельный проект: сравнение с RabbitMQ | ⭐⭐⭐ | ⬜ |
 
 ---
@@ -181,25 +181,72 @@ POST /orders → order-service
 
 ---
 
-### ⬜ Temporal
+### ✅ Temporal
+
+> [!example] Коммит
+> [feat: Temporal durable saga with async order creation](https://github.com/tikhomirowww/microservices-course/commit/958c8bfa)
 
 > [!tip] Что решает
 > Самописный оркестратор не переживает падения процесса и не имеет retry из коробки.
 
-**Что строим:**
-- Workflow: async/await код который durable (переживает падения процесса)
-- Activity: отдельный шаг с retry-политикой
-- Замена нашего saga-orchestrator на Temporal Workflow
+**Схема:**
+```
+POST /orders → saga-orchestrator
+  → Temporal: start orderSagaWorkflow(userId, orderId)
+  ← {orderId, status: "pending"}  ← мгновенно
+
+  [фоново]
+  Activity: createOrder → order-service (RMQ)
+  Activity: processPayment → payment-service (RMQ)
+  Activity: confirmOrder / cancelOrder → order-service (RMQ)
+```
+
+**Что построили:**
+- `worker.ts` — Temporal Worker: поллит сервер, выполняет Activities
+- `order-saga.workflow.ts` — детерминированный сценарий саги (только логика, без IO)
+- `order-saga.activities.ts` — шаги с реальным IO и retry (3 попытки, 30s timeout)
+- `POST /orders` возвращает `pending` мгновенно, workflow живёт независимо от HTTP
+- `orderId` генерируется до старта workflow — клиент сразу знает id заказа
+- Temporal UI на `:8080` — история каждого шага, retry, ошибки
+
+> [!important] Ключевые решения
+> - Workflow детерминирован — нельзя делать IO напрямую, только через Activities
+> - Activities решают проблему недетерминированности: выполняются один раз, результат сохраняется в историю
+> - `node:20-slim` вместо `node:20-alpine` — Temporal SDK требует glibc, Alpine использует musl
+> - `DB=postgres12` для Temporal auto-setup — sqlite не поддерживается в 1.24.2
+> - `POST /orders` → saga-orchestrator, `GET /orders` → order-service (разделение по методу в gateway)
 
 ---
 
-### ⬜ Event Sourcing
+### ✅ Event Sourcing
 
 > [!tip] Что решает
 > При обычном подходе история изменений теряется — хранится только текущее состояние.
 
-**Что строим:**
-- Вместо `UPDATE SET status = 'cancelled'` → запись события `OrderCancelled`
-- Текущее состояние = apply всех событий (reduce)
-- Event store вместо обычной таблицы
-- Temporal projection: восстановление состояния на любой момент
+**Схема:**
+```
+POST /orders → saga-orchestrator
+  → createOrder activity → order-service
+    → INSERT order + INSERT order_summary + INSERT order_event(OrderCreated)  [одна транзакция]
+
+updateStatus(orderId, CONFIRMED) → order-service
+  → UPDATE order + UPDATE order_summary + INSERT order_event(OrderConfirmed)
+
+GET /orders/:id/events → order-service
+  ← [{type: ORDER_CREATED, ...}, {type: ORDER_CONFIRMED, ...}]
+```
+
+**Что построили:**
+- `OrderEvent` entity — таблица `order_event`: `id`, `orderId`, `type` (enum), `payload` (json), `createdAt`
+- `OrderEventType` enum — `ORDER_CREATED`, `ORDER_CONFIRMED`, `ORDER_CANCELLED`
+- `EventStoreService` — `append(event, manager?)` и `getEvents(orderId)`
+- `append` принимает опциональный `EntityManager` — чтобы работать в рамках внешней транзакции
+- `createPending` — пишет `ORDER_CREATED` атомарно в одной транзакции с заказом
+- `updateStatus` — пишет `ORDER_CONFIRMED` / `ORDER_CANCELLED`
+- `GET /orders/:id/events` — новый эндпоинт, возвращает полную ленту событий
+
+> [!important] Ключевые решения
+> - `EventStoreService.append(event, manager?)` — опциональный manager для transactional writes
+> - `OrderSummary` остаётся как read-проекция — именно так и работает Event Sourcing в продакшене
+> - `@CreateDateColumn()` — время проставляется автоматически, не передаётся вручную
+> - Event store — append-only, события никогда не обновляются и не удаляются

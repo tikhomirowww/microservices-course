@@ -15,6 +15,8 @@ import { Outbox } from './entities';
 import { OrderSummary } from 'src/orders-read/order-summary.entity';
 import { firstValueFrom, Observable } from 'rxjs';
 import type { ClientGrpc } from '@nestjs/microservices';
+import { EventStoreService } from 'src/event-store/event-store.service';
+import { OrderEventType } from 'src/event-store/event-store.enum';
 
 interface IInventoryService {
   checkAndReserve: (data: {
@@ -37,6 +39,8 @@ export class OrdersService implements OnModuleInit {
 
     @Inject('INVENTORY_SERVICE')
     private readonly grpcClient: ClientGrpc,
+
+    private readonly eventStoreService: EventStoreService,
   ) {}
 
   private inventoryService: IInventoryService;
@@ -93,6 +97,14 @@ export class OrdersService implements OnModuleInit {
         status: ORDER_STATUS_ENUM.PENDING,
       });
       await manager.save(order);
+      await this.eventStoreService.append(
+        {
+          orderId,
+          type: OrderEventType.OrderCreated,
+          payload: { userId },
+        },
+        manager,
+      );
       await manager.save(OrderSummary, {
         orderId,
         userId,
@@ -110,6 +122,14 @@ export class OrdersService implements OnModuleInit {
     if (!order) throw new BadRequestException('Order not found');
     await this.orderRepository.update({ id: orderId }, { status });
     await this.orderSummaryRepository.update({ orderId }, { status });
+    await this.eventStoreService.append({
+      orderId,
+      type:
+        status === ORDER_STATUS_ENUM.CONFIRMED
+          ? OrderEventType.OrderConfirmed
+          : OrderEventType.OrderCancelled,
+      payload: { status },
+    });
     return { id: orderId, status };
   }
 
