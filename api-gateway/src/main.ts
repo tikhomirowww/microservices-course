@@ -8,7 +8,7 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
   const jwtMiddleware = app.get(JwtMiddleware);
-  const jwt = jwtMiddleware.use.bind(jwtMiddleware); 
+  const jwt = jwtMiddleware.use.bind(jwtMiddleware);
 
   app.use(
     jwt,
@@ -18,15 +18,19 @@ async function bootstrap() {
       changeOrigin: true,
     }),
   );
+
+  // POST /orders → saga-orchestrator (Temporal workflow)
   app.use(
     jwt,
     createProxyMiddleware({
+      pathFilter: (path, req) => path.startsWith('/orders') && req.method === 'POST',
       target: process.env.SAGA_SERVICE_URL,
       changeOrigin: true,
-      pathFilter: '/saga',
       on: { proxyReq: attachUserHeaders },
     }),
   );
+
+  // GET/PATCH/DELETE /orders → order-service
   app.use(
     jwt,
     createProxyMiddleware({

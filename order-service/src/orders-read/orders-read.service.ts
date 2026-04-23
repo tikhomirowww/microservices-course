@@ -12,6 +12,8 @@ export class OrdersReadService {
   ) {}
 
   async findAll() {
-    return await this.orderSummaryRepository.find();
+    return await this.orderSummaryRepository.find({
+      select: ['orderId', 'userId', 'status'],
+    });
   }
 }

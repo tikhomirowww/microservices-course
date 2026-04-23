@@ -85,13 +85,21 @@ export class OrdersService implements OnModuleInit {
     });
   }
 
-  async createPending(userId: string) {
-    return await this.orderRepository.save(
-      this.orderRepository.create({
+  async createPending(userId: string, orderId: string) {
+    return await this.dataSource.transaction(async (manager) => {
+      const order = manager.create(Order, {
+        id: orderId,
         userId,
         status: ORDER_STATUS_ENUM.PENDING,
-      }),
-    );
+      });
+      await manager.save(order);
+      await manager.save(OrderSummary, {
+        orderId,
+        userId,
+        status: ORDER_STATUS_ENUM.PENDING,
+      });
+      return order;
+    });
   }
 
   async updateStatus(orderId: string, status: ORDER_STATUS_ENUM) {

@@ -9,17 +9,65 @@
 
 | # | Тема | Что решает | Сложность | Статус |
 |---|------|-----------|-----------|--------|
-| 0 | **Saga Orchestration** | Распределённые транзакции | ⭐⭐⭐ | ✅ Готово |
-| 1 | **API Gateway** | Единая точка входа, JWT, rate limiting | ⭐⭐ | ✅ Готово |
-| 2 | **Outbox Pattern** | Атомарность: БД + очередь | ⭐⭐ | ✅ Готово |
-| 3 | **CQRS** | Разделение read/write моделей | ⭐⭐⭐ | ✅ Готово |
-| 4 | **gRPC** | Типизированный бинарный протокол | ⭐⭐⭐ | ✅ Готово |
-| 5 | **Temporal** | Durable саги с retry и историей | ⭐⭐⭐⭐ | ⬜ |
-| 6 | **Event Sourcing** | Состояние как лента событий | ⭐⭐⭐⭐⭐ | ⬜ |
+| 0 | **HTTP Communication** | Базовое межсервисное взаимодействие | ⭐ | ✅ Готово |
+| 1 | **RabbitMQ** | Асинхронная коммуникация через брокер | ⭐⭐ | ✅ Готово |
+| 2 | **Circuit Breaker** | Устойчивость к падению зависимостей | ⭐⭐ | ✅ Готово |
+| 3 | **Saga Choreography** | Распределённые транзакции без оркестратора | ⭐⭐⭐ | ✅ Готово |
+| 4 | **Saga Orchestration** | Распределённые транзакции с оркестратором | ⭐⭐⭐ | ✅ Готово |
+| 5 | **API Gateway** | Единая точка входа, JWT, rate limiting | ⭐⭐ | ✅ Готово |
+| 6 | **Outbox Pattern** | Атомарность: БД + очередь | ⭐⭐ | ✅ Готово |
+| 7 | **CQRS** | Разделение read/write моделей | ⭐⭐⭐ | ✅ Готово |
+| 8 | **gRPC** | Типизированный бинарный протокол | ⭐⭐⭐ | ✅ Готово |
+| 9 | **Temporal** | Durable саги с retry и историей | ⭐⭐⭐⭐ | ⬜ |
+| 10 | **Event Sourcing** | Состояние как лента событий | ⭐⭐⭐⭐⭐ | ⬜ |
+| 11 | **Kafka** | Отдельный проект: сравнение с RabbitMQ | ⭐⭐⭐ | ⬜ |
 
 ---
 
 ## Детали по темам
+
+### ✅ HTTP Communication
+
+> [!example] Коммит
+> [feat: user-service and order-service communicating via HTTP](https://github.com/tikhomirowww/microservices-course/commit/d00dfeba)
+
+- `order-service` вызывает `user-service` по HTTP для валидации пользователя при создании заказа
+- Синхронная коммуникация: один сервис ждёт ответа другого
+
+---
+
+### ✅ RabbitMQ
+
+> [!example] Коммит
+> [feat: async communication via RabbitMQ](https://github.com/tikhomirowww/microservices-course/commit/fcdcc952)
+
+- Асинхронная публикация событий через брокер
+- `order-service` публикует `order_created` → `payment-service` и `notification-service` потребляют независимо
+- NestJS `ClientProxy` + `@MessagePattern` / `@EventPattern`
+
+---
+
+### ✅ Circuit Breaker
+
+> [!example] Коммит
+> [feat: circuit breaker for user-service HTTP calls](https://github.com/tikhomirowww/microservices-course/commit/d58d8dc9)
+
+- Защита от каскадных отказов при недоступности `user-service`
+- Состояния: Closed → Open → Half-Open
+- Библиотека `opossum`: `fallback` возвращает заглушку вместо ошибки
+
+---
+
+### ✅ Saga Choreography
+
+> [!example] Коммит
+> [feat: saga choreography - order status driven by payment events](https://github.com/tikhomirowww/microservices-course/commit/129c638d)
+
+- Без центрального оркестратора — сервисы реагируют на события друг друга
+- `payment-service` публикует `payment_success` / `payment_failed` → `order-service` меняет статус заказа
+- Плюс: нет единой точки отказа. Минус: логика распределена, сложно отлаживать
+
+---
 
 ### ✅ Saga Orchestration
 

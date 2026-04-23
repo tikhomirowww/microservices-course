@@ -25,8 +25,8 @@ export class OrdersController {
   }
 
   @MessagePattern('create_order')
-  async handleCreateOrder(@Payload() data: { userId: string }) {
-    return this.ordersService.createPending(data.userId);
+  async handleCreateOrder(@Payload() data: { userId: string; orderId: string }) {
+    return this.ordersService.createPending(data.userId, data.orderId);
   }
 
   @MessagePattern('confirm_order')
